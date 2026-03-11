@@ -1,0 +1,8 @@
+streamlit
+streamlit-ketcher
+joblib
+numpy
+pandas
+scikit-learn
+rdkit-pypi
+mordred
