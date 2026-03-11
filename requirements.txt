@@ -1,0 +1,11 @@
+streamlit
+joblib==1.4.2
+numpy==1.26.4
+pandas==2.2.3
+scikit-learn==1.5.2
+matplotlib==3.9.2
+lime==0.2.0.1
+shap==0.46.0
+rdkit-pypi
+mordred
+streamlit-ketcher
