@@ -1,8 +1,10 @@
 streamlit
-streamlit-ketcher
-joblib
-numpy
 pandas
+numpy
 scikit-learn
+joblib
 rdkit-pypi
 mordred
+shap
+lime
+matplotlib
