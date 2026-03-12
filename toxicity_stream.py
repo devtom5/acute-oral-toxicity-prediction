@@ -7,7 +7,7 @@ import streamlit as st
 from rdkit import Chem
 from rdkit.Chem import AllChem, MACCSkeys, rdMolDescriptors
 from rdkit.Chem.Draw import rdMolDraw2D
-
+st.write("✅ APP STARTED SUCCESSFULLY")
 # -----------------------------
 # Optional Mordred support
 # -----------------------------
