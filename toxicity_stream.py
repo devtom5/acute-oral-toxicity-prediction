@@ -88,7 +88,7 @@ with col1:
 
     <b>Laboratory of Pharmacology and Toxicology</b><br>
     College of Veterinary Medicine<br>
-    Institute of Animal Medicine, Gyeongsang National University<br>
+    Gyeongsang National University<br>
     Jinju 52828, Republic of Korea
 
     </div>
@@ -401,7 +401,7 @@ st.markdown(
     """
 **Laboratory of Pharmacology and Toxicology**  
 **College of Veterinary Medicine**  
-**Institute of Animal Medicine, Gyeongsang National University, Jinju 52828, Republic of Korea**  
+**Gyeongsang National University, Jinju 52828, Republic of Korea**  
 
 **Contact information**  
 Kim Euikyung(김의경), 
