@@ -1,5 +1,6 @@
 import os
 import joblib
+import requests
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -30,6 +31,20 @@ st.set_page_config(
     page_icon="🧪",
     layout="wide"
 )
+
+# -----------------------------
+# Global visit counter
+# -----------------------------
+def get_global_count():
+    try:
+        url = "https://api.countapi.xyz/hit/gnu-acute-toxicity-app/visits"
+        r = requests.get(url, timeout=5)
+        if r.status_code == 200:
+            data = r.json()
+            return data.get("value", "N/A")
+        return "N/A"
+    except Exception:
+        return "N/A"
 
 # -----------------------------
 # Scientific styling
@@ -66,6 +81,16 @@ st.markdown(
         box-shadow: 0 6px 18px rgba(15,23,42,0.05);
         margin-bottom: 0.8rem;
     }
+    .counter-box {
+        background: white;
+        border: 1px solid #dbe4ee;
+        border-radius: 14px;
+        padding: 12px 16px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.06);
+        margin-top: 12px;
+        margin-bottom: 8px;
+        font-size: 1rem;
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -74,7 +99,7 @@ st.markdown(
 # -----------------------------
 # Header banner
 # -----------------------------
-col1, col2 = st.columns([3,1])
+col1, col2 = st.columns([3, 1])
 
 with col1:
     st.markdown("""
@@ -113,22 +138,20 @@ with col2:
 st.caption("Draw a molecule or paste a SMILES string to predict acute oral toxicity compounds using the trained stacked model.")
 
 # -----------------------------
-# Sidebar
+# Fixed model paths
 # -----------------------------
-st.sidebar.header("Model settings")
-available_models = []
-for fname in ["Stack_Top5.joblib", "Stack_Top3.joblib"]:
-    if os.path.exists(fname):
-        available_models.append(fname)
-
-if not available_models:
-    st.sidebar.error("No model file found in the current folder.")
-    st.stop()
-
-selected_model_name = st.sidebar.selectbox("Select model", available_models)
-MODEL_PATH = selected_model_name
+MODEL_PATH = "Stack_Top5.joblib"
 FEATURES_PATH = "final_selected_features.joblib"
 IMPUTER_PATH = "median_imputer.joblib"
+
+missing_files = []
+for f in [MODEL_PATH, FEATURES_PATH, IMPUTER_PATH]:
+    if not os.path.exists(f):
+        missing_files.append(f)
+
+if missing_files:
+    st.error("Missing required file(s): " + ", ".join(missing_files))
+    st.stop()
 
 # -----------------------------
 # Helper functions
@@ -139,14 +162,12 @@ def safe_float(x):
     except Exception:
         return np.nan
 
-
 @st.cache_resource(show_spinner=False)
 def load_artifacts(model_path, features_path, imputer_path):
     model = joblib.load(model_path)
     selected_features = joblib.load(features_path)
     imputer = joblib.load(imputer_path)
     return model, selected_features, imputer
-
 
 def split_feature_groups(selected_features):
     groups = {
@@ -171,7 +192,6 @@ def split_feature_groups(selected_features):
             groups["Mordred"].append(f)
     return groups
 
-
 def infer_nbits(feature_list, default_nbits):
     if not feature_list:
         return default_nbits
@@ -183,12 +203,10 @@ def infer_nbits(feature_list, default_nbits):
             pass
     return max(max(idxs) + 1, default_nbits) if idxs else default_nbits
 
-
 def smiles_to_mol(smiles):
     if not isinstance(smiles, str) or not smiles.strip():
         return None
     return Chem.MolFromSmiles(smiles.strip())
-
 
 def mol_to_png_bytes(mol, size=(500, 300)):
     drawer = rdMolDraw2D.MolDraw2DCairo(size[0], size[1])
@@ -196,21 +214,17 @@ def mol_to_png_bytes(mol, size=(500, 300)):
     drawer.FinishDrawing()
     return drawer.GetDrawingText()
 
-
 def compute_morgan(mol, nbits):
     fp = AllChem.GetMorganFingerprintAsBitVect(mol, radius=2, nBits=nbits)
     return {f"Morgan_{i}": int(fp.GetBit(i)) for i in range(nbits)}
-
 
 def compute_maccs(mol):
     fp = MACCSkeys.GenMACCSKeys(mol)
     return {f"MACCS_{i}": int(fp.GetBit(i)) for i in range(1, 167)}
 
-
 def compute_atompairs(mol, nbits):
     fp = rdMolDescriptors.GetHashedAtomPairFingerprintAsBitVect(mol, nBits=nbits)
     return {f"AtomPairs_{i}": int(fp.GetBit(i)) for i in range(nbits)}
-
 
 def compute_mordred_selected(mol, needed_mordred):
     out = {f: np.nan for f in needed_mordred}
@@ -225,10 +239,8 @@ def compute_mordred_selected(mol, needed_mordred):
         pass
     return out
 
-
 def compute_pubchem_placeholder(needed_pubchem):
     return {f: 0.0 for f in needed_pubchem}
-
 
 def build_feature_row(smiles, selected_features):
     mol = smiles_to_mol(smiles)
@@ -252,6 +264,7 @@ def build_feature_row(smiles, selected_features):
         row.update(compute_pubchem_placeholder(groups["PubChem"]))
 
     df = pd.DataFrame([row])
+
     for f in selected_features:
         if f not in df.columns:
             if str(f).startswith(("Morgan_", "morgan_", "PubChem_", "PubchemFP", "pubchem_", "AtomPairs_", "AP_", "MACCS_", "maccs_")):
@@ -262,7 +275,6 @@ def build_feature_row(smiles, selected_features):
     df = df[selected_features]
     df = df.apply(pd.to_numeric, errors="coerce")
     return df
-
 
 def predict_one(smiles, model, selected_features, imputer):
     feat_df = build_feature_row(smiles, selected_features)
@@ -276,12 +288,10 @@ def predict_one(smiles, model, selected_features, imputer):
 # -----------------------------
 try:
     model, selected_features, imputer = load_artifacts(MODEL_PATH, FEATURES_PATH, IMPUTER_PATH)
-    st.sidebar.success(f"Loaded {selected_model_name}")
-    st.sidebar.write(f"Selected features: {len(selected_features)}")
     if not MORDRED_AVAILABLE:
-        st.sidebar.warning("Mordred not available. Mordred features will be missing.")
+        st.warning("Mordred not available. Mordred features will be missing.")
 except Exception as e:
-    st.sidebar.error(f"Could not load files:\n\n{e}")
+    st.error(f"Could not load files:\n\n{e}")
     st.stop()
 
 # -----------------------------
@@ -301,13 +311,16 @@ with tab1:
         drawn_smiles = st_ketcher(height=450)
         if drawn_smiles:
             st.success(f"Editor SMILES: {drawn_smiles}")
+
         if st.button("Use drawn molecule"):
             if drawn_smiles:
                 st.session_state["drawn_smiles"] = drawn_smiles
             else:
                 st.warning("No molecule drawn yet.")
+
         if "drawn_smiles" in st.session_state:
             smiles = st.session_state["drawn_smiles"]
+
     except Exception:
         st.info("To enable drawing, install: pip install streamlit-ketcher")
 
@@ -316,8 +329,9 @@ with tab1:
             pred, prob = predict_one(smiles, model, selected_features, imputer)
             mol = smiles_to_mol(smiles)
 
-            col1, col2 = st.columns([1, 1])
-            with col1:
+            c1, c2 = st.columns([1, 1])
+
+            with c1:
                 st.markdown("### Prediction summary")
                 st.metric("Predicted class", "Toxic" if pred == 1 else "Non-toxic")
                 st.metric("Toxicity probability", f"{prob:.4f}")
@@ -342,7 +356,7 @@ with tab1:
                 else:
                     st.success("Non-toxic")
 
-            with col2:
+            with c2:
                 st.markdown("### Chemical structure")
                 if mol is not None:
                     png = mol_to_png_bytes(mol)
@@ -353,7 +367,10 @@ with tab1:
 
 with tab2:
     st.subheader("Batch prediction from CSV")
-    st.markdown("<div class='card'>Upload a CSV containing a <code>SMILES</code> column for multi-compound toxicity screening.</div>", unsafe_allow_html=True)
+    st.markdown(
+        "<div class='card'>Upload a CSV containing a <code>SMILES</code> column for multi-compound toxicity screening.</div>",
+        unsafe_allow_html=True
+    )
     uploaded = st.file_uploader("Upload CSV", type=["csv"])
 
     if uploaded is not None:
@@ -388,6 +405,7 @@ with tab2:
                 res_df = pd.DataFrame(results)
                 st.success("Batch prediction complete")
                 st.dataframe(res_df, use_container_width=True)
+
                 csv = res_df.to_csv(index=False).encode("utf-8")
                 st.download_button(
                     "Download predictions CSV",
@@ -395,19 +413,41 @@ with tab2:
                     file_name="toxicity_predictions.csv",
                     mime="text/csv",
                 )
-
 st.markdown("---")
+
+visit_count = get_global_count()
+
+st.markdown(
+    f"""
+    <div style="
+        background:white;
+        border:1px solid #dbe4ee;
+        border-radius:16px;
+        padding:18px;
+        box-shadow:0 4px 15px rgba(0,0,0,0.06);
+        margin-top:18px;
+        margin-bottom:18px;
+    ">
+        <h4 style="margin-top:0; margin-bottom:10px;">Global visitors</h4>
+        <div style="font-size:1.05rem; margin-bottom:8px;">🌍 Total app visits: <b>{visit_count}</b></div>
+        <div style="font-size:0.9rem; color:#475569;">
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
 st.markdown(
     """
 **Laboratory of Pharmacology and Toxicology**  
 **College of Veterinary Medicine**  
-**Gyeongsang National University, Jinju 52828, Republic of Korea**  
+**Gyeongsang National University, Jinju 52828, Republic of Korea**
 
 **Contact information**  
-Kim Euikyung(김의경), 
-Professor, 
+Kim Euikyung (김의경)  
+Professor  
 Phone: 055-772-2355  
 Email: ekim@gnu.ac.kr  
-Office: 501-308  
+Office: 501-308
 """
 )
+
