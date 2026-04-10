@@ -8,6 +8,7 @@ import streamlit as st
 from rdkit import Chem
 from rdkit.Chem import AllChem, MACCSkeys, rdMolDescriptors
 from rdkit.Chem.Draw import rdMolDraw2D
+
 # -----------------------------
 # Optional Mordred support
 # -----------------------------
@@ -126,7 +127,7 @@ with col2:
     border:1px solid #dbe4ee;
     box-shadow:0 4px 15px rgba(0,0,0,0.08);">
     <b>Contact information</b><br><br>
-    Kim, Euikyung (김의경)<br>
+    Euikyung Kim (김의경)<br>
     Professor<br><br>
     Phone: 055-772-2355<br>
     Email: ekim@gnu.ac.kr<br>
@@ -370,10 +371,33 @@ with tab2:
         "<div class='card'>Upload a CSV containing a <code>SMILES</code> column for multi-compound toxicity screening.</div>",
         unsafe_allow_html=True
     )
-    uploaded = st.file_uploader("Upload CSV", type=["csv"])
-
+    
+    st.markdown("""
+    <style>
+    [data-testid="stFileUploaderDropzoneInstructions"] > div {
+    display: none;
+    }
+    [data-testid="stFileUploaderDropzone"] section + div {
+    display: none;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    uploaded = st.file_uploader(
+        "Drag and drop file here",
+        type=["csv"],
+        help="CSV only • Maximum 100 SMILES"
+    )
+    st.caption("CSV only • Maximum 100 SMILES")
+    
+    
     if uploaded is not None:
         batch_df = pd.read_csv(uploaded)
+
+        if len(batch_df) > 100:
+            st.error("Please upload a CSV containing a maximum of 100 SMILES only.")
+            st.stop()
+
         st.write("Preview")
         st.dataframe(batch_df.head(), use_container_width=True)
 
@@ -412,6 +436,7 @@ with tab2:
                     file_name="toxicity_predictions.csv",
                     mime="text/csv",
                 )
+
 st.markdown("---")
 
 visit_count = get_global_count()
@@ -430,6 +455,7 @@ st.markdown(
         <h4 style="margin-top:0; margin-bottom:10px;">Global visitors</h4>
         <div style="font-size:1.05rem; margin-bottom:8px;">🌍 Total app visits: <b>{visit_count}</b></div>
         <div style="font-size:0.9rem; color:#475569;">
+        </div>
     </div>
     """,
     unsafe_allow_html=True
@@ -442,11 +468,10 @@ st.markdown(
 **Gyeongsang National University, Jinju 52828, Republic of Korea**
 
 **Contact information**  
-Kim Euikyung (김의경)  
+Euikyung Kim (김의경)  
 Professor  
 Phone: 055-772-2355  
 Email: ekim@gnu.ac.kr  
 Office: 501-308
 """
 )
-
